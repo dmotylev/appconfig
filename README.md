@@ -1,4 +1,4 @@
-# Nutrition [![Build Status](https://travis-ci.org/dmotylev/nutrition.png?branch=master)](https://travis-ci.org/dmotylev/nutrition) [![Coverage Status](https://coveralls.io/repos/dmotylev/nutrition/badge.png?branch=master)](https://coveralls.io/r/dmotylev/nutririon?branch=master)
+# Nutrition [![Build Status](https://travis-ci.org/dmotylev/nutrition.png?branch=master)](https://travis-ci.org/dmotylev/nutrition) [![Build Status](https://drone.io/github.com/dmotylev/nutrition/status.png)](https://drone.io/github.com/dmotylev/nutrition/latest) [![Coverage Status](https://coveralls.io/repos/dmotylev/nutrition/badge.png?branch=master)](https://coveralls.io/r/dmotylev/nutririon?branch=master)
 
 TBD
 
