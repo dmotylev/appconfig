@@ -6,9 +6,7 @@ import (
 	"time"
 )
 
-type DummyStruct struct {
-	i int
-}
+type DummyStruct struct{}
 
 type Fields struct {
 	String     string
