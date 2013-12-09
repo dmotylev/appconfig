@@ -1,6 +1,8 @@
 package nutrition
 
 import (
+	"io"
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -141,4 +143,129 @@ func TestEnvHarvest_DurationErr(t *testing.T) {
 
 func TestEnvHarvest_DateErr(t *testing.T) {
 	testErrEnvHarvest("APP_DATE", t)
+}
+
+const fileContent = `
+string=123.4
+uint=123
+int=-123
+float=123.4
+bool=true
+duration=1h2m3s
+date=2006-01-02T15:04:05+07:00
+dateunix=Mon Jan 2 15:04:05 MST 2006
+struct=Dummy
+nonsetable=123
+novalue=
+onlykey
+`
+
+func makeTestFile(content string) (*os.File, error) {
+	file, err := ioutil.TempFile(os.TempDir(), "nutrition_test")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := io.WriteString(file, content); err != nil {
+		return nil, err
+	}
+	return file, err
+}
+
+func TestFileHarvest(t *testing.T) {
+	file, err := makeTestFile(fileContent)
+	defer func() {
+		if file != nil {
+			os.Remove(file.Name())
+		}
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var f Fields
+	err = File(file.Name()).Harvest(&f)
+	if err != nil {
+		t.Error(err)
+	}
+
+	verify(f, t)
+}
+
+func TestFileHarvest_NoFile(t *testing.T) {
+	file, err := makeTestFile("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(file.Name())
+
+	var f Fields
+	err = File(file.Name()).Harvest(&f)
+
+	t.Skip() // TODO: remove when I/O errors will not be shadowed
+
+	if err == nil {
+		t.Error(err)
+	}
+}
+
+func TestEnvFileHarvest(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("APP_STRING", "123.4")
+	os.Setenv("APP_UINT", "123")
+	os.Setenv("APP_FLOAT", "123.4")
+	os.Setenv("APP_BOOL", "true")
+	os.Setenv("APP_DURATION", "1h2m3s")
+	os.Setenv("APP_DATE", "2006-01-02T15:04:05+07:00")
+	os.Setenv("APP_DATEUNIX", "Mon Jan 2 15:04:05 MST 2006")
+	os.Setenv("APP_STRUCT", "Dummy")
+	os.Setenv("APP_NONSETABLE", "123")
+
+	file, err := makeTestFile("int=-123")
+	defer func() {
+		if file != nil {
+			os.Remove(file.Name())
+		}
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var f Fields
+	err = Env("app_").File(file.Name()).Harvest(&f)
+	if err != nil {
+		t.Error(err)
+	}
+
+	verify(f, t)
+}
+
+func TestFileEnvHarvest(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("APP_STRING", "123.4")
+	os.Setenv("APP_UINT", "123")
+	os.Setenv("APP_FLOAT", "123.4")
+	os.Setenv("APP_BOOL", "true")
+	os.Setenv("APP_DURATION", "1h2m3s")
+	os.Setenv("APP_DATE", "2006-01-02T15:04:05+07:00")
+	os.Setenv("APP_DATEUNIX", "Mon Jan 2 15:04:05 MST 2006")
+	os.Setenv("APP_STRUCT", "Dummy")
+	os.Setenv("APP_NONSETABLE", "123")
+
+	file, err := makeTestFile("int=-123")
+	defer func() {
+		if file != nil {
+			os.Remove(file.Name())
+		}
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var f Fields
+	err = File(file.Name()).Env("app_").Harvest(&f)
+	if err != nil {
+		t.Error(err)
+	}
+
+	verify(f, t)
 }

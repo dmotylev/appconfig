@@ -1,9 +1,11 @@
 package nutrition
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -130,7 +132,28 @@ func (this *harvester) Env(prefix string) Nutrition {
 }
 
 func (this *harvester) File(filename string) Nutrition {
-	this.contexts = append(this.contexts, &fileContext{filename})
+	keyValue := regexp.MustCompile("^([^=]+)=(.*)$")
+	ctx := &fileContext{make(map[string]string)}
+	file, err := os.Open(filename)
+	defer func() {
+		if file != nil {
+			file.Close()
+		}
+	}()
+	if err != nil {
+		// TODO: consider not to shadow I/O errors
+		return this
+	}
+	scanner := bufio.NewScanner(bufio.NewReader(file))
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := keyValue.FindStringSubmatch(line)
+		if parts == nil {
+			continue
+		}
+		ctx.values[strings.ToLower(parts[1])] = parts[2]
+	}
+	this.contexts = append(this.contexts, ctx)
 	return this
 }
 
@@ -149,9 +172,10 @@ func (this *envContext) lookup(s reflect.StructField) (string, bool) {
 // file context
 
 type fileContext struct {
-	filename string
+	values map[string]string
 }
 
 func (this *fileContext) lookup(s reflect.StructField) (string, bool) {
-	return "", false
+	v, found := this.values[strings.ToLower(s.Name)]
+	return v, found
 }
