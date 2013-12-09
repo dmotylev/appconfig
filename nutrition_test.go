@@ -192,19 +192,11 @@ func TestFileHarvest(t *testing.T) {
 }
 
 func TestFileHarvest_NoFile(t *testing.T) {
-	file, err := makeTestFile("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Remove(file.Name())
-
 	var f Fields
-	err = File(file.Name()).Harvest(&f)
-
-	t.Skip() // TODO: remove when I/O errors will not be shadowed
+	err := File(":$:").Harvest(&f)
 
 	if err == nil {
-		t.Error(err)
+		t.Error("err=nil when file not found, want not nil")
 	}
 }
 

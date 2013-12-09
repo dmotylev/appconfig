@@ -38,6 +38,7 @@ func (e *NutritionError) Error() string {
 }
 
 type context interface {
+	lastError() error
 	lookup(s reflect.StructField) (string, bool)
 }
 
@@ -61,6 +62,11 @@ func (this *harvester) lookup(f reflect.StructField) (string, bool) {
 func (this *harvester) Harvest(v interface{}) error {
 	if reflect.Indirect(reflect.ValueOf(v)).Kind() != reflect.Struct {
 		panic("nutrition: Harvest for non-struct type")
+	}
+	for _, ctx := range this.contexts {
+		if err := ctx.lastError(); err != nil {
+			return err
+		}
 	}
 	vStruct := reflect.ValueOf(v).Elem()
 	for i := 0; i < vStruct.NumField(); i++ {
@@ -133,7 +139,8 @@ func (this *harvester) Env(prefix string) Nutrition {
 
 func (this *harvester) File(filename string) Nutrition {
 	keyValue := regexp.MustCompile("^([^=]+)=(.*)$")
-	ctx := &fileContext{make(map[string]string)}
+	ctx := &fileContext{nil, make(map[string]string)}
+	this.contexts = append(this.contexts, ctx)
 	file, err := os.Open(filename)
 	defer func() {
 		if file != nil {
@@ -141,7 +148,7 @@ func (this *harvester) File(filename string) Nutrition {
 		}
 	}()
 	if err != nil {
-		// TODO: consider not to shadow I/O errors
+		ctx.lError = err
 		return this
 	}
 	scanner := bufio.NewScanner(bufio.NewReader(file))
@@ -153,7 +160,6 @@ func (this *harvester) File(filename string) Nutrition {
 		}
 		ctx.values[strings.ToLower(parts[1])] = parts[2]
 	}
-	this.contexts = append(this.contexts, ctx)
 	return this
 }
 
@@ -161,6 +167,10 @@ func (this *harvester) File(filename string) Nutrition {
 
 type envContext struct {
 	prefix string
+}
+
+func (this *envContext) lastError() error {
+	return nil
 }
 
 func (this *envContext) lookup(s reflect.StructField) (string, bool) {
@@ -172,7 +182,12 @@ func (this *envContext) lookup(s reflect.StructField) (string, bool) {
 // file context
 
 type fileContext struct {
+	lError error
 	values map[string]string
+}
+
+func (this *fileContext) lastError() error {
+	return this.lError
 }
 
 func (this *fileContext) lookup(s reflect.StructField) (string, bool) {
