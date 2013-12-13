@@ -1,10 +1,12 @@
 package nutrition
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
 	"testing"
+	"testing/iotest"
 	"time"
 )
 
@@ -55,17 +57,17 @@ func verify(f Fields, t *testing.T) {
 	}
 }
 
-func TestHarvestPanic(t *testing.T) {
+func TestFeedPanic(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Error("no panic on non-struct type, want panic")
 		}
 	}()
 	var i int
-	(&harvester{}).Harvest(i)
+	(&harvester{}).Feed(i)
 }
 
-func TestHarvest(t *testing.T) {
+func TestFeed(t *testing.T) {
 	f := Fields{
 		String:   "123.4",
 		Uint:     123,
@@ -76,7 +78,7 @@ func TestHarvest(t *testing.T) {
 		Date:     time.Date(2006, 1, 2, 15, 4, 5, 0, time.FixedZone("", int(7*int64(time.Hour/time.Second)))),
 	}
 
-	err := (&harvester{}).Harvest(&f)
+	err := (&harvester{}).Feed(&f)
 	if err != nil {
 		t.Error(err)
 	}
@@ -84,7 +86,7 @@ func TestHarvest(t *testing.T) {
 	verify(f, t)
 }
 
-func TestEnvHarvest(t *testing.T) {
+func TestEnvFeed(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	os.Setenv("APP_UINT", "123")
@@ -98,7 +100,7 @@ func TestEnvHarvest(t *testing.T) {
 	os.Setenv("APP_NONSETABLE", "123")
 
 	var f Fields
-	err := Env("app_").Harvest(&f)
+	err := Env("app_").Feed(&f)
 	if err != nil {
 		t.Error(err)
 	}
@@ -106,12 +108,12 @@ func TestEnvHarvest(t *testing.T) {
 	verify(f, t)
 }
 
-func testErrEnvHarvest(k string, t *testing.T) {
+func testErrEnvFeed(k string, t *testing.T) {
 	os.Clearenv()
 	os.Setenv(k, "Err")
 
 	var f Fields
-	err := Env("app_").Harvest(&f)
+	err := Env("app_").Feed(&f)
 	if err == nil {
 		t.Errorf("err=nil for errorneous %s, want not nil", k)
 	}
@@ -121,31 +123,31 @@ func testErrEnvHarvest(k string, t *testing.T) {
 	}
 }
 
-func TestEnvHarvest_UintErr(t *testing.T) {
-	testErrEnvHarvest("APP_UINT", t)
+func TestEnvFeed_UintErr(t *testing.T) {
+	testErrEnvFeed("APP_UINT", t)
 }
 
-func TestEnvHarvest_IntErr(t *testing.T) {
-	testErrEnvHarvest("APP_INT", t)
+func TestEnvFeed_IntErr(t *testing.T) {
+	testErrEnvFeed("APP_INT", t)
 }
 
-func TestEnvHarvest_FloatErr(t *testing.T) {
-	testErrEnvHarvest("APP_FLOAT", t)
+func TestEnvFeed_FloatErr(t *testing.T) {
+	testErrEnvFeed("APP_FLOAT", t)
 }
 
-func TestEnvHarvest_BoolErr(t *testing.T) {
-	testErrEnvHarvest("APP_BOOL", t)
+func TestEnvFeed_BoolErr(t *testing.T) {
+	testErrEnvFeed("APP_BOOL", t)
 }
 
-func TestEnvHarvest_DurationErr(t *testing.T) {
-	testErrEnvHarvest("APP_DURATION", t)
+func TestEnvFeed_DurationErr(t *testing.T) {
+	testErrEnvFeed("APP_DURATION", t)
 }
 
-func TestEnvHarvest_DateErr(t *testing.T) {
-	testErrEnvHarvest("APP_DATE", t)
+func TestEnvFeed_DateErr(t *testing.T) {
+	testErrEnvFeed("APP_DATE", t)
 }
 
-const fileContent = `
+const stream = `
 string=123.4
 uint=123
 int=-123
@@ -160,7 +162,7 @@ novalue=
 onlykey
 `
 
-func makeTestFile(content string) (*os.File, error) {
+func CreateFile(content string) (*os.File, error) {
 	file, err := ioutil.TempFile(os.TempDir(), "nutrition_test")
 	if err != nil {
 		return nil, err
@@ -171,8 +173,8 @@ func makeTestFile(content string) (*os.File, error) {
 	return file, err
 }
 
-func TestFileHarvest(t *testing.T) {
-	file, err := makeTestFile(fileContent)
+func TestFileFeed(t *testing.T) {
+	file, err := CreateFile(stream)
 	defer func() {
 		if file != nil {
 			os.Remove(file.Name())
@@ -183,81 +185,68 @@ func TestFileHarvest(t *testing.T) {
 	}
 
 	var f Fields
-	err = File(file.Name()).Harvest(&f)
-	if err != nil {
+	if err := File(file.Name()).Feed(&f); err != nil {
+		t.Fatal(err)
+	}
+
+	verify(f, t)
+}
+
+func TestFileFeed_NoFile(t *testing.T) {
+	var f Fields
+	if err := File(":$:").Feed(&f); err != nil {
+		t.Errorf("err = '%s', want nil", err)
+	}
+}
+
+func TestReaderFeed(t *testing.T) {
+	var f Fields
+	if err := Reader(bytes.NewBufferString(stream)).Feed(&f); err != nil {
 		t.Error(err)
 	}
 
 	verify(f, t)
 }
 
-func TestFileHarvest_NoFile(t *testing.T) {
+func TestReaderFeed_Error(t *testing.T) {
 	var f Fields
-	err := File(":$:").Harvest(&f)
-
-	if err == nil {
-		t.Error("err=nil when file not found, want not nil")
+	if Reader(iotest.TimeoutReader(bytes.NewBufferString(stream))).Feed(&f) == nil {
+		t.Errorf("err = nil, want not nil")
 	}
 }
 
-func TestEnvFileHarvest(t *testing.T) {
+func TestEnvReaderFeed(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
-	os.Setenv("APP_UINT", "123")
-	os.Setenv("APP_FLOAT", "123.4")
-	os.Setenv("APP_BOOL", "true")
-	os.Setenv("APP_DURATION", "1h2m3s")
-	os.Setenv("APP_DATE", "2006-01-02T15:04:05+07:00")
-	os.Setenv("APP_DATEUNIX", "Mon Jan 2 15:04:05 MST 2006")
-	os.Setenv("APP_STRUCT", "Dummy")
-	os.Setenv("APP_NONSETABLE", "123")
-
-	file, err := makeTestFile("int=-123")
-	defer func() {
-		if file != nil {
-			os.Remove(file.Name())
-		}
-	}()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader := bytes.NewBufferString("int=-123")
 
 	var f Fields
-	err = Env("app_").File(file.Name()).Harvest(&f)
-	if err != nil {
+	if err := Env("app_").Reader(reader).Feed(&f); err != nil {
 		t.Error(err)
 	}
 
-	verify(f, t)
+	if f.String != "123.4" {
+		t.Errorf("f.String = '%v', want '123.4'", f.String)
+	}
+	if f.Int != -123 {
+		t.Errorf("f.Int = %v, want -123", f.Int)
+	}
 }
 
-func TestFileEnvHarvest(t *testing.T) {
+func TestReaderEnvFeed(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
-	os.Setenv("APP_UINT", "123")
-	os.Setenv("APP_FLOAT", "123.4")
-	os.Setenv("APP_BOOL", "true")
-	os.Setenv("APP_DURATION", "1h2m3s")
-	os.Setenv("APP_DATE", "2006-01-02T15:04:05+07:00")
-	os.Setenv("APP_DATEUNIX", "Mon Jan 2 15:04:05 MST 2006")
-	os.Setenv("APP_STRUCT", "Dummy")
-	os.Setenv("APP_NONSETABLE", "123")
-
-	file, err := makeTestFile("int=-123")
-	defer func() {
-		if file != nil {
-			os.Remove(file.Name())
-		}
-	}()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader := bytes.NewBufferString("int=-123")
 
 	var f Fields
-	err = File(file.Name()).Env("app_").Harvest(&f)
-	if err != nil {
+	if err := Reader(reader).Env("app_").Feed(&f); err != nil {
 		t.Error(err)
 	}
 
-	verify(f, t)
+	if f.String != "123.4" {
+		t.Errorf("f.String = '%v', want '123.4'", f.String)
+	}
+	if f.Int != -123 {
+		t.Errorf("f.Int = %v, want -123", f.Int)
+	}
 }
