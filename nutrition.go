@@ -113,7 +113,10 @@ func (this *harvester) Feed(v interface{}) error {
 		fStruct := vStruct.Type().Field(i)
 		vString, found := this.lookup(fStruct)
 		if !found {
-			continue
+			vString = fStruct.Tag.Get("default")
+			if vString == "" {
+				continue
+			}
 		}
 		switch f.Kind() {
 		case reflect.String:

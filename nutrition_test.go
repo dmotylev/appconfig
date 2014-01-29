@@ -100,6 +100,21 @@ func TestFeed(t *testing.T) {
 	verify(f, t)
 }
 
+func TestDefault(t *testing.T) {
+	os.Clearenv()
+
+	var f struct {
+		String string `default:"the owls are not what they seem"`
+	}
+	err := Env("app_").Feed(&f)
+	if err != nil {
+		t.Error(err)
+	}
+	if f.String != "the owls are not what they seem" {
+		t.Errorf("f.String = '%v', want 'the owls are not what they seem'", f.String)
+	}
+}
+
 func TestEnvFeed(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
