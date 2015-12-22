@@ -1,4 +1,4 @@
-// Copyright 2013 Dmitry Motylev
+// Copyright 2015 Dmitry Motylev
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutrition
+package appconfig
 
 import (
 	"bytes"
@@ -71,17 +71,17 @@ func verify(f Fields, t *testing.T) {
 	}
 }
 
-func TestFeedPanic(t *testing.T) {
+func TestScanPanic(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Error("no panic on non-struct type, want panic")
 		}
 	}()
 	var i int
-	(&harvester{}).Feed(i)
+	(&scanner{}).Scan(i)
 }
 
-func TestFeed(t *testing.T) {
+func TestScan(t *testing.T) {
 	f := Fields{
 		String:   "123.4",
 		Uint:     123,
@@ -92,7 +92,7 @@ func TestFeed(t *testing.T) {
 		Date:     time.Date(2006, 1, 2, 15, 4, 5, 0, time.FixedZone("", int(7*int64(time.Hour/time.Second)))),
 	}
 
-	err := (&harvester{}).Feed(&f)
+	err := (&scanner{}).Scan(&f)
 	if err != nil {
 		t.Error(err)
 	}
@@ -103,19 +103,21 @@ func TestFeed(t *testing.T) {
 func TestDefault(t *testing.T) {
 	os.Clearenv()
 
+	const s = `owls are not what do you think about them`
+
 	var f struct {
-		String string `default:"the owls are not what they seem"`
+		String string `default:"owls are not what do you think about them"`
 	}
-	err := Env("app_").Feed(&f)
+	err := Env("app_").Scan(&f)
 	if err != nil {
 		t.Error(err)
 	}
-	if f.String != "the owls are not what they seem" {
-		t.Errorf("f.String = '%v', want 'the owls are not what they seem'", f.String)
+	if f.String != s {
+		t.Errorf("f.String = '%v', want '%s'", f.String, s)
 	}
 }
 
-func TestEnvFeed(t *testing.T) {
+func TestEnvScan(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	os.Setenv("APP_UINT", "123")
@@ -129,7 +131,7 @@ func TestEnvFeed(t *testing.T) {
 	os.Setenv("APP_NONSETABLE", "123")
 
 	var f Fields
-	err := Env("app_").Feed(&f)
+	err := Env("app_").Scan(&f)
 	if err != nil {
 		t.Error(err)
 	}
@@ -137,12 +139,12 @@ func TestEnvFeed(t *testing.T) {
 	verify(f, t)
 }
 
-func testErrEnvFeed(k string, t *testing.T) {
+func testErrEnvScan(k string, t *testing.T) {
 	os.Clearenv()
 	os.Setenv(k, "Err")
 
 	var f Fields
-	err := Env("app_").Feed(&f)
+	err := Env("app_").Scan(&f)
 	if err == nil {
 		t.Errorf("err=nil for errorneous %s, want not nil", k)
 	}
@@ -152,28 +154,28 @@ func testErrEnvFeed(k string, t *testing.T) {
 	}
 }
 
-func TestEnvFeed_UintErr(t *testing.T) {
-	testErrEnvFeed("APP_UINT", t)
+func TestEnvScan_UintErr(t *testing.T) {
+	testErrEnvScan("APP_UINT", t)
 }
 
-func TestEnvFeed_IntErr(t *testing.T) {
-	testErrEnvFeed("APP_INT", t)
+func TestEnvScan_IntErr(t *testing.T) {
+	testErrEnvScan("APP_INT", t)
 }
 
-func TestEnvFeed_FloatErr(t *testing.T) {
-	testErrEnvFeed("APP_FLOAT", t)
+func TestEnvScan_FloatErr(t *testing.T) {
+	testErrEnvScan("APP_FLOAT", t)
 }
 
-func TestEnvFeed_BoolErr(t *testing.T) {
-	testErrEnvFeed("APP_BOOL", t)
+func TestEnvScan_BoolErr(t *testing.T) {
+	testErrEnvScan("APP_BOOL", t)
 }
 
-func TestEnvFeed_DurationErr(t *testing.T) {
-	testErrEnvFeed("APP_DURATION", t)
+func TestEnvScan_DurationErr(t *testing.T) {
+	testErrEnvScan("APP_DURATION", t)
 }
 
-func TestEnvFeed_DateErr(t *testing.T) {
-	testErrEnvFeed("APP_DATE", t)
+func TestEnvScan_DateErr(t *testing.T) {
+	testErrEnvScan("APP_DATE", t)
 }
 
 const stream = `
@@ -192,7 +194,7 @@ onlykey
 `
 
 func CreateFile(content string) (*os.File, error) {
-	file, err := ioutil.TempFile(os.TempDir(), "nutrition_test")
+	file, err := ioutil.TempFile(os.TempDir(), "appconfig_test")
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +204,7 @@ func CreateFile(content string) (*os.File, error) {
 	return file, err
 }
 
-func TestFileFeed(t *testing.T) {
+func TestFileScan(t *testing.T) {
 	file, err := CreateFile(stream)
 	defer func() {
 		if file != nil {
@@ -214,43 +216,43 @@ func TestFileFeed(t *testing.T) {
 	}
 
 	var f Fields
-	if err := File(file.Name()).Feed(&f); err != nil {
+	if err := File(file.Name()).Scan(&f); err != nil {
 		t.Fatal(err)
 	}
 
 	verify(f, t)
 }
 
-func TestFileFeed_NoFile(t *testing.T) {
+func TestFileScan_NoFile(t *testing.T) {
 	var f Fields
-	if err := File(":$:").Feed(&f); err != nil {
+	if err := File(":$:").Scan(&f); err != nil {
 		t.Errorf("err = '%s', want nil", err)
 	}
 }
 
-func TestReaderFeed(t *testing.T) {
+func TestReaderScan(t *testing.T) {
 	var f Fields
-	if err := Reader(bytes.NewBufferString(stream)).Feed(&f); err != nil {
+	if err := Reader(bytes.NewBufferString(stream)).Scan(&f); err != nil {
 		t.Error(err)
 	}
 
 	verify(f, t)
 }
 
-func TestReaderFeed_Error(t *testing.T) {
+func TestReaderScan_Error(t *testing.T) {
 	var f Fields
-	if Reader(iotest.TimeoutReader(bytes.NewBufferString(stream))).Feed(&f) == nil {
+	if Reader(iotest.TimeoutReader(bytes.NewBufferString(stream))).Scan(&f) == nil {
 		t.Errorf("err = nil, want not nil")
 	}
 }
 
-func TestEnvReaderFeed(t *testing.T) {
+func TestEnvReaderScan(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	reader := bytes.NewBufferString("int=-123")
 
 	var f Fields
-	if err := Env("app_").Reader(reader).Feed(&f); err != nil {
+	if err := Env("app_").Reader(reader).Scan(&f); err != nil {
 		t.Error(err)
 	}
 
@@ -262,13 +264,13 @@ func TestEnvReaderFeed(t *testing.T) {
 	}
 }
 
-func TestReaderEnvFeed(t *testing.T) {
+func TestReaderEnvScan(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	reader := bytes.NewBufferString("int=-123")
 
 	var f Fields
-	if err := Reader(reader).Env("app_").Feed(&f); err != nil {
+	if err := Reader(reader).Env("app_").Scan(&f); err != nil {
 		t.Error(err)
 	}
 
