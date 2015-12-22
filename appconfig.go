@@ -1,4 +1,4 @@
-// Copyright 2013 Dmitry Motylev
+// Copyright 2015 Dmitry Motylev
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package nutrition provides decoding of different sources based on user defined struct.
-// Source is the stream of lines in 'key=value' form. Environment, file and raw io.Reader sources are supported.
-// Package can decode types boolean, numeric, and string types as well as time.Duration and time.Time. The later could be customized with formats (default is time.UnixDate).
-package nutrition
+// Package appconfig provides initialization for user defined struct
+// from configured sources. Source is the stream of lines in 'key=value' form.
+// OS environment, file and raw io.Reader sources are supported. The package
+// can decode boolean, numeric, string, time.Duration and time.Time.
+// The later could be customized with formats
+package appconfig
 
 import (
 	"bufio"
@@ -29,34 +31,35 @@ import (
 	"time"
 )
 
-// Build Nutrition instance that decodes environment variables. Given prefix used for looking values in environment
-func Env(prefix string) Nutrition {
-	return newFeeder().Env(prefix)
+// Build AppConfig instance that decodes environment variables.
+// Given prefix used for looking values in environment
+func Env(prefix string) AppConfig {
+	return newScanner().Env(prefix)
 }
 
-// Build Nutrition instance that decodes given Reader
-func Reader(reader io.Reader) Nutrition {
-	return newFeeder().Reader(reader)
+// Build AppConfig instance that decodes given Reader
+func Reader(reader io.Reader) AppConfig {
+	return newScanner().Reader(reader)
 }
 
-// Build Nutrition instance that decodes given File.
+// Build AppConfig instance that decodes given File.
 // Do nothing if file does not exists.
-func File(filename string) Nutrition {
-	return newFeeder().File(filename)
+func File(filename string) AppConfig {
+	return newScanner().File(filename)
 }
 
-type Nutrition interface {
-	// Feeds given struct with decoded values from provided sources
-	Feed(v interface{}) error
+type AppConfig interface {
+	// Scans given struct with decoded values from provided sources
+	Scan(v interface{}) error
 	// Add environment as source for values
-	Env(prefix string) Nutrition
+	Env(prefix string) AppConfig
 	// Add Reader as source for values
-	Reader(reader io.Reader) Nutrition
+	Reader(reader io.Reader) AppConfig
 	// Add File as source for values
-	File(filename string) Nutrition
+	File(filename string) AppConfig
 }
 
-type NutritionError struct {
+type AppConfigError struct {
 	// Raw value as it was read from source
 	Value string
 	// Name of the user struct
@@ -65,29 +68,30 @@ type NutritionError struct {
 	Field string
 	// Type of the field
 	FieldType string
-	// Cause why the field was not feed with value
+	// Cause why value was not assigned to the field
 	Cause error
 }
 
-func (e *NutritionError) Error() string {
-	return fmt.Sprintf("nutrition.Feed: can't assign '%s' to %s.%s %s: %v", e.Value, e.Struct, e.Field, e.FieldType, e.Cause)
+func (e *AppConfigError) Error() string {
+	return fmt.Sprintf("appconfig: can't assign '%s' to %s.%s %s: %v",
+		e.Value, e.Struct, e.Field, e.FieldType, e.Cause)
 }
 
-type context interface {
+type source interface {
 	err() error
 	lookup(s reflect.StructField) (string, bool)
 }
 
-type harvester struct {
-	contexts []context
+type scanner struct {
+	sources []source
 }
 
-func newFeeder() *harvester {
-	return &harvester{make([]context, 0, 1)}
+func newScanner() *scanner {
+	return &scanner{make([]source, 0, 1)}
 }
 
-func (this *harvester) lookup(f reflect.StructField) (string, bool) {
-	for _, ctx := range this.contexts {
+func (this *scanner) lookup(f reflect.StructField) (string, bool) {
+	for _, ctx := range this.sources {
 		if v, found := ctx.lookup(f); found {
 			return v, true
 		}
@@ -95,11 +99,11 @@ func (this *harvester) lookup(f reflect.StructField) (string, bool) {
 	return "", false
 }
 
-func (this *harvester) Feed(v interface{}) error {
+func (this *scanner) Scan(v interface{}) error {
 	if reflect.Indirect(reflect.ValueOf(v)).Kind() != reflect.Struct {
-		panic("nutrition: Feed for non-struct type")
+		panic("appconfig: scan for non-struct type")
 	}
-	for _, ctx := range this.contexts {
+	for _, ctx := range this.sources {
 		if err := ctx.err(); err != nil {
 			return err
 		}
@@ -124,7 +128,7 @@ func (this *harvester) Feed(v interface{}) error {
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			vUint, err := strconv.ParseUint(vString, 10, f.Type().Bits())
 			if err != nil {
-				return &NutritionError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
+				return &AppConfigError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
 			}
 			f.SetUint(vUint)
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -138,19 +142,19 @@ func (this *harvester) Feed(v interface{}) error {
 				vInt, err = strconv.ParseInt(vString, 10, f.Type().Bits())
 			}
 			if err != nil {
-				return &NutritionError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
+				return &AppConfigError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
 			}
 			f.SetInt(vInt)
 		case reflect.Float32, reflect.Float64:
 			vFloat, err := strconv.ParseFloat(vString, f.Type().Bits())
 			if err != nil {
-				return &NutritionError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
+				return &AppConfigError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
 			}
 			f.SetFloat(vFloat)
 		case reflect.Bool:
 			vBool, err := strconv.ParseBool(vString)
 			if err != nil {
-				return &NutritionError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
+				return &AppConfigError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
 			}
 			f.SetBool(vBool)
 		case reflect.Struct:
@@ -163,7 +167,7 @@ func (this *harvester) Feed(v interface{}) error {
 			}
 			d, err := time.Parse(format, vString)
 			if err != nil {
-				return &NutritionError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
+				return &AppConfigError{vString, vStruct.Type().Name(), fStruct.Name, f.Kind().String(), err}
 			}
 			f.Set(reflect.ValueOf(d))
 		}
@@ -171,15 +175,15 @@ func (this *harvester) Feed(v interface{}) error {
 	return nil
 }
 
-func (this *harvester) Env(prefix string) Nutrition {
-	this.contexts = append(this.contexts, &envContext{prefix})
+func (this *scanner) Env(prefix string) AppConfig {
+	this.sources = append(this.sources, &envContext{prefix})
 	return this
 }
 
-func (this *harvester) Reader(reader io.Reader) Nutrition {
+func (this *scanner) Reader(reader io.Reader) AppConfig {
 	keyValue := regexp.MustCompile("^([^=]+)=(.*)$")
 	ctx := &mapContext{nil, make(map[string]string)}
-	this.contexts = append(this.contexts, ctx)
+	this.sources = append(this.sources, ctx)
 	scanner := bufio.NewScanner(bufio.NewReader(reader))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -195,7 +199,7 @@ func (this *harvester) Reader(reader io.Reader) Nutrition {
 	return this
 }
 
-func (this *harvester) File(filename string) Nutrition {
+func (this *scanner) File(filename string) AppConfig {
 	file, err := os.Open(filename)
 	defer func() {
 		if file != nil {
@@ -203,7 +207,7 @@ func (this *harvester) File(filename string) Nutrition {
 		}
 	}()
 	if err != nil {
-		this.contexts = append(this.contexts, &mapContext{nil, make(map[string]string)})
+		this.sources = append(this.sources, &mapContext{nil, make(map[string]string)})
 		return this
 	}
 	return this.Reader(file)

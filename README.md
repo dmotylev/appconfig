@@ -1,22 +1,23 @@
-# Nutrition [![Build Status](https://travis-ci.org/dmotylev/nutrition.png?branch=master)](https://travis-ci.org/dmotylev/nutrition) [![Coverage Status](https://coveralls.io/repos/dmotylev/nutrition/badge.png)](https://coveralls.io/r/dmotylev/nutrition) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
+# AppConfig [![Build Status](https://travis-ci.org/dmotylev/appconfig.png?branch=master)](https://travis-ci.org/dmotylev/appconfig) [![Coverage Status](https://coveralls.io/repos/dmotylev/appconfig/badge.png)](https://coveralls.io/r/dmotylev/appconfig) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
 
-Package nutrition provides decoding of different sources based on user defined struct.
-Source is the stream of lines in 'key=value' form. Environment, file and raw io.Reader sources are supported.
-Package can decode types boolean, numeric, and string types as well as time.Duration and time.Time. The later could be customized with formats.
+Package appconfig provides initialization for user defined struct from configured sources.
+Source is the stream of lines in 'key=value' form. Environment, file and raw 
+io.Reader sources are supported. The package can decode boolean, numeric, string,
+time.Duration and time.Time. The later could be customized with formats.
 
 # Documentation
 
-The Nutrition API reference is available on [GoDoc](http://godoc.org/github.com/dmotylev/nutrition).
+The AppConfig API reference is available on [GoDoc](http://godoc.org/github.com/dmotylev/appconfig).
 
 # Installation
 
-Install Nutrition using the `go get` command:
+Install AppConfig using the `go get` command:
 
-	go get -u github.com/dmotylev/nutrition
+	go get -u github.com/dmotylev/appconfig
 
 # Example
 
-Feed struct from environment only:
+Scan struct from environment only:
 
 ```go
 // Try:
@@ -29,7 +30,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dmotylev/nutrition"
+	"github.com/dmotylev/appconfig"
 )
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 		NumWorkers int
 	}
 
-	err := nutrition.Env("APP_").Feed(&conf)
+	err := appconfig.Env("APP_").Scan(&conf)
 
 	fmt.Printf("err=%v\n", err)
 	fmt.Printf("timeout=%s\n", conf.Timeout)
@@ -50,7 +51,7 @@ func main() {
 }
 ```
 
-Feed struct from stdin only:
+Scan struct from stdin only:
 
 ```go
 // Try:
@@ -64,7 +65,7 @@ import (
 	"time"
 	"os"
 
-	"github.com/dmotylev/nutrition"
+	"github.com/dmotylev/appconfig"
 )
 
 func main() {
@@ -75,7 +76,7 @@ func main() {
 		NumWorkers int
 	}
 
-	err := nutrition.Reader(os.Stdin).Feed(&conf)
+	err := appconfig.Reader(os.Stdin).Scan(&conf)
 
 	fmt.Printf("err=%v\n", err)
 	fmt.Printf("timeout=%s\n", conf.Timeout)
@@ -85,7 +86,7 @@ func main() {
 }
 ```
 
-Feed struct from file only:
+Scan struct from file only:
 
 ```go
 // Try:
@@ -98,7 +99,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dmotylev/nutrition"
+	"github.com/dmotylev/appconfig"
 )
 
 func main() {
@@ -109,7 +110,7 @@ func main() {
 		NumWorkers int
 	}
 
-	err := nutrition.Reader("env").Feed(&conf)
+	err := appconfig.Reader("env").Scan(&conf)
 
 	fmt.Printf("err=%v\n", err)
 	fmt.Printf("timeout=%s\n", conf.Timeout)
@@ -133,7 +134,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dmotylev/nutrition"
+	"github.com/dmotylev/appconfig"
 )
 
 func main() {
@@ -145,7 +146,7 @@ func main() {
 	}
 
 	// You can change the order. First source with value will be used
-	err := nutrition.Env("APP_").Reader(os.Stdin).File("env").Feed(&conf)
+	err := appconfig.Env("APP_").Reader(os.Stdin).File("env").Scan(&conf)
 
 	fmt.Printf("err=%v\n", err)
 	fmt.Printf("timeout=%s\n", conf.Timeout)
@@ -156,4 +157,4 @@ func main() {
 ```
 # License
 
-The package available under [LICENSE](https://github.com/dmotylev/nutrition/blob/master/LICENSE).
+The package available under [LICENSE](https://github.com/dmotylev/appconfig/blob/master/LICENSE).
