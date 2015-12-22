@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package appconfig provides easy initialization of user defined struct from configured sources.
-// Source is the stream of lines in 'key=value' form. Environment, file and
-// raw io.Reader sources are supported. Package can decode types boolean, numeric,
-// and string types as well as time.Duration and time.Time. The later could be
-// customized with formats (default is time.UnixDate).
+// Package appconfig provides initialization for user defined struct
+// from configured sources. Source is the stream of lines in 'key=value' form.
+// OS environment, file and raw io.Reader sources are supported. The package
+// can decode boolean, numeric, string, time.Duration and time.Time.
+// The later could be customized with formats
 package appconfig
 
 import (

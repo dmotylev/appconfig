@@ -1,8 +1,9 @@
-# Nutrition [![Build Status](https://travis-ci.org/dmotylev/appconfig.png?branch=master)](https://travis-ci.org/dmotylev/appconfig) [![Coverage Status](https://coveralls.io/repos/dmotylev/appconfig/badge.png)](https://coveralls.io/r/dmotylev/appconfig) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
+# AppConfig [![Build Status](https://travis-ci.org/dmotylev/appconfig.png?branch=master)](https://travis-ci.org/dmotylev/appconfig) [![Coverage Status](https://coveralls.io/repos/dmotylev/appconfig/badge.png)](https://coveralls.io/r/dmotylev/appconfig) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
 
-Package appconfig provides easy initialization of user defined struct from configured sources.
-Source is the stream of lines in 'key=value' form. Environment, file and raw io.Reader sources are supported.
-Package can decode types boolean, numeric, and string types as well as time.Duration and time.Time. The later could be customized with formats.
+Package appconfig provides initialization for user defined struct from configured sources.
+Source is the stream of lines in 'key=value' form. Environment, file and raw 
+io.Reader sources are supported. The package can decode boolean, numeric, string,
+time.Duration and time.Time. The later could be customized with formats.
 
 # Documentation
 
