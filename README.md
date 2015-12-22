@@ -1,4 +1,4 @@
-# Nutrition [![Build Status](https://travis-ci.org/dmotylev/nutrition.png?branch=master)](https://travis-ci.org/dmotylev/nutrition) [![Build Status](https://drone.io/github.com/dmotylev/nutrition/status.png)](https://drone.io/github.com/dmotylev/nutrition/latest) [![Coverage Status](https://coveralls.io/repos/dmotylev/nutrition/badge.png)](https://coveralls.io/r/dmotylev/nutrition)
+# Nutrition [![Build Status](https://travis-ci.org/dmotylev/nutrition.png?branch=master)](https://travis-ci.org/dmotylev/nutrition) [![Coverage Status](https://coveralls.io/repos/dmotylev/nutrition/badge.png)](https://coveralls.io/r/dmotylev/nutrition) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
 
 Package nutrition provides decoding of different sources based on user defined struct.
 Source is the stream of lines in 'key=value' form. Environment, file and raw io.Reader sources are supported.
