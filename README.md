@@ -1,4 +1,4 @@
-# Nutrition [![Build Status](https://travis-ci.org/dmotylev/nutrition.png?branch=master)](https://travis-ci.org/dmotylev/nutrition) [![Coverage Status](https://coveralls.io/repos/dmotylev/nutrition/badge.png)](https://coveralls.io/r/dmotylev/nutrition) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
+# Nutrition [![Build Status](https://travis-ci.org/dmotylev/appconfig.png?branch=master)](https://travis-ci.org/dmotylev/appconfig) [![Coverage Status](https://coveralls.io/repos/dmotylev/appconfig/badge.png)](https://coveralls.io/r/dmotylev/appconfig) [![GoDoc](https://godoc.org/github.com/dmotylev/appconfig?status.svg)](https://godoc.org/github.com/dmotylev/appconfig)
 
 Package appconfig provides easy initialization of user defined struct from configured sources.
 Source is the stream of lines in 'key=value' form. Environment, file and raw io.Reader sources are supported.
