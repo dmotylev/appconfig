@@ -1,27 +1,21 @@
-// Copyright 2015 Dmitry Motylev
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright (c) 2013 Dmitry Motylev. All rights reserved.
+// Use of this source code is governed by the MIT License that can be found in
+// the LICENSE file.
 
-package appconfig
+package appconfig_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 	"testing/iotest"
 	"time"
+
+	"github.com/dmotylev/appconfig"
 )
 
 type DummyStruct struct{}
@@ -39,7 +33,22 @@ type Fields struct {
 	nonSetable int
 }
 
-func verify(f Fields, t *testing.T) {
+const stream = `
+string=123.4
+uint=123
+int=-123
+float=123.4
+bool=true
+duration=1h2m3s
+date=2006-01-02T15:04:05+07:00
+dateunix=Mon Jan 2 15:04:05 MST 2006
+struct=Dummy
+nonsetable=123
+novalue=
+onlykey
+`
+
+func test(f Fields, t *testing.T) {
 	if f.nonSetable != 0 {
 		t.Errorf("f.nonSetable = %v, want 0", f.nonSetable)
 	}
@@ -71,17 +80,17 @@ func verify(f Fields, t *testing.T) {
 	}
 }
 
-func TestScanPanic(t *testing.T) {
+func TestLoad_NonStruct(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Error("no panic on non-struct type, want panic")
 		}
 	}()
 	var i int
-	(&scanner{}).Scan(i)
+	appconfig.Load(i)
 }
 
-func TestScan(t *testing.T) {
+func TestLoad_NoSources(t *testing.T) {
 	f := Fields{
 		String:   "123.4",
 		Uint:     123,
@@ -92,15 +101,14 @@ func TestScan(t *testing.T) {
 		Date:     time.Date(2006, 1, 2, 15, 4, 5, 0, time.FixedZone("", int(7*int64(time.Hour/time.Second)))),
 	}
 
-	err := (&scanner{}).Scan(&f)
-	if err != nil {
+	if err := appconfig.Load(&f); err != nil {
 		t.Error(err)
 	}
 
-	verify(f, t)
+	test(f, t)
 }
 
-func TestDefault(t *testing.T) {
+func TestLoad_FromEnvWithDefault(t *testing.T) {
 	os.Clearenv()
 
 	const s = `owls are not what do you think about them`
@@ -108,16 +116,16 @@ func TestDefault(t *testing.T) {
 	var f struct {
 		String string `default:"owls are not what do you think about them"`
 	}
-	err := Env("app_").Scan(&f)
-	if err != nil {
+
+	if err := appconfig.Load(&f, appconfig.FromEnv("app_")); err != nil {
 		t.Error(err)
 	}
 	if f.String != s {
-		t.Errorf("f.String = '%v', want '%s'", f.String, s)
+		t.Errorf("f.String == '%v', want '%s'", f.String, s)
 	}
 }
 
-func TestEnvScan(t *testing.T) {
+func TestLoad_FromEnv(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	os.Setenv("APP_UINT", "123")
@@ -131,69 +139,52 @@ func TestEnvScan(t *testing.T) {
 	os.Setenv("APP_NONSETABLE", "123")
 
 	var f Fields
-	err := Env("app_").Scan(&f)
-	if err != nil {
+	if err := appconfig.Load(&f, appconfig.FromEnv("app_")); err != nil {
 		t.Error(err)
 	}
 
-	verify(f, t)
+	test(f, t)
 }
 
-func testErrEnvScan(k string, t *testing.T) {
+func testLoad_FromEnvInvSrc(k string, t *testing.T) {
 	os.Clearenv()
 	os.Setenv(k, "Err")
 
 	var f Fields
-	err := Env("app_").Scan(&f)
+	err := appconfig.Load(&f, appconfig.FromEnv("app_"))
 	if err == nil {
-		t.Errorf("err=nil for errorneous %s, want not nil", k)
+		t.Errorf("err==nil for invalid %s, want not nil", k)
 	}
-	// extend coverage a little bit more
 	if err.Error() == "" {
-		t.Error("err.Error()=\"\", want non empty string")
+		t.Error(`err.Error()=="", want non empty string`)
 	}
 }
 
-func TestEnvScan_UintErr(t *testing.T) {
-	testErrEnvScan("APP_UINT", t)
+func TestLoad_FromEnvUintErr(t *testing.T) {
+	testLoad_FromEnvInvSrc("APP_UINT", t)
 }
 
-func TestEnvScan_IntErr(t *testing.T) {
-	testErrEnvScan("APP_INT", t)
+func TestLoad_FromEnvIntErr(t *testing.T) {
+	testLoad_FromEnvInvSrc("APP_INT", t)
 }
 
-func TestEnvScan_FloatErr(t *testing.T) {
-	testErrEnvScan("APP_FLOAT", t)
+func TestLoad_FromEnvFloatErr(t *testing.T) {
+	testLoad_FromEnvInvSrc("APP_FLOAT", t)
 }
 
-func TestEnvScan_BoolErr(t *testing.T) {
-	testErrEnvScan("APP_BOOL", t)
+func TestLoad_FromEnvBoolErr(t *testing.T) {
+	testLoad_FromEnvInvSrc("APP_BOOL", t)
 }
 
-func TestEnvScan_DurationErr(t *testing.T) {
-	testErrEnvScan("APP_DURATION", t)
+func TestLoad_FromEnvDurationErr(t *testing.T) {
+	testLoad_FromEnvInvSrc("APP_DURATION", t)
 }
 
-func TestEnvScan_DateErr(t *testing.T) {
-	testErrEnvScan("APP_DATE", t)
+func TestLoad_FromEnvDateErr(t *testing.T) {
+	testLoad_FromEnvInvSrc("APP_DATE", t)
 }
 
-const stream = `
-string=123.4
-uint=123
-int=-123
-float=123.4
-bool=true
-duration=1h2m3s
-date=2006-01-02T15:04:05+07:00
-dateunix=Mon Jan 2 15:04:05 MST 2006
-struct=Dummy
-nonsetable=123
-novalue=
-onlykey
-`
-
-func CreateFile(content string) (*os.File, error) {
+func createFile(content string) (*os.File, error) {
 	file, err := ioutil.TempFile(os.TempDir(), "appconfig_test")
 	if err != nil {
 		return nil, err
@@ -204,55 +195,51 @@ func CreateFile(content string) (*os.File, error) {
 	return file, err
 }
 
-func TestFileScan(t *testing.T) {
-	file, err := CreateFile(stream)
-	defer func() {
-		if file != nil {
-			os.Remove(file.Name())
-		}
-	}()
+func TestLoad_FromFile(t *testing.T) {
+	file, err := createFile(stream)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer os.Remove(file.Name())
 
 	var f Fields
-	if err := File(file.Name()).Scan(&f); err != nil {
+	if err := appconfig.Load(&f, appconfig.FromFile(file.Name())); err != nil {
 		t.Fatal(err)
 	}
 
-	verify(f, t)
+	test(f, t)
 }
 
-func TestFileScan_NoFile(t *testing.T) {
+func TestLoad_FromNoFile(t *testing.T) {
 	var f Fields
-	if err := File(":$:").Scan(&f); err != nil {
-		t.Errorf("err = '%s', want nil", err)
+	if err := appconfig.Load(&f, appconfig.FromFile(":$:")); err != nil {
+		t.Errorf("err == '%s', want nil", err)
 	}
 }
 
-func TestReaderScan(t *testing.T) {
+func TestLoad_FromReader(t *testing.T) {
 	var f Fields
-	if err := Reader(bytes.NewBufferString(stream)).Scan(&f); err != nil {
+	if err := appconfig.Load(&f, appconfig.FromReader(bytes.NewBufferString(stream))); err != nil {
 		t.Error(err)
 	}
 
-	verify(f, t)
+	test(f, t)
 }
 
-func TestReaderScan_Error(t *testing.T) {
+func TestLoad_FromReaderError(t *testing.T) {
 	var f Fields
-	if Reader(iotest.TimeoutReader(bytes.NewBufferString(stream))).Scan(&f) == nil {
-		t.Errorf("err = nil, want not nil")
+	if appconfig.Load(&f, appconfig.FromReader(iotest.TimeoutReader(bytes.NewBufferString(stream)))) == nil {
+		t.Errorf("err == nil, want not nil")
 	}
 }
 
-func TestEnvReaderScan(t *testing.T) {
+func TestLoad_FromEnvFromReader(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	reader := bytes.NewBufferString("int=-123")
 
 	var f Fields
-	if err := Env("app_").Reader(reader).Scan(&f); err != nil {
+	if err := appconfig.Load(&f, appconfig.FromEnv("app_"), appconfig.FromReader(reader)); err != nil {
 		t.Error(err)
 	}
 
@@ -264,13 +251,13 @@ func TestEnvReaderScan(t *testing.T) {
 	}
 }
 
-func TestReaderEnvScan(t *testing.T) {
+func TestLoad_FromReaderFromEnv(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_STRING", "123.4")
 	reader := bytes.NewBufferString("int=-123")
 
 	var f Fields
-	if err := Reader(reader).Env("app_").Scan(&f); err != nil {
+	if err := appconfig.Load(&f, appconfig.FromReader(reader), appconfig.FromEnv("app_")); err != nil {
 		t.Error(err)
 	}
 
@@ -280,4 +267,39 @@ func TestReaderEnvScan(t *testing.T) {
 	if f.Int != -123 {
 		t.Errorf("f.Int = %v, want -123", f.Int)
 	}
+}
+
+func TestErr(t *testing.T) {
+	if v, found := appconfig.Err(nil).Lookup(reflect.StructField{}); v != "" || found {
+		t.Error("false positive")
+	}
+}
+
+func ExampleLoad_FromEnv() {
+	os.Clearenv()
+	os.Setenv("APP_TIMEOUT", "1h2m3s")
+	os.Setenv("APP_DAY", "2013-12-13")
+	os.Setenv("APP_NUMWORKERS", "5")
+	os.Setenv("APP_WORKERNAME", "Hulk")
+
+	var conf struct {
+		Timeout    time.Duration
+		Day        time.Time `time,format:"2006-01-02"`
+		WorkerName string
+		NumWorkers int
+	}
+
+	err := appconfig.Load(&conf, appconfig.FromEnv("APP_"))
+
+	fmt.Printf("err=%v\n", err)
+	fmt.Printf("timeout=%s\n", conf.Timeout)
+	fmt.Printf("day=%s\n", conf.Day.Format(time.UnixDate))
+	fmt.Printf("worker=%s\n", conf.WorkerName)
+	fmt.Printf("workers=%d\n", conf.NumWorkers)
+	// Output:
+	// err=<nil>
+	// timeout=1h2m3s
+	// day=Fri Dec 13 00:00:00 UTC 2013
+	// worker=Hulk
+	// workers=5
 }
